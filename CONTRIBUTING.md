@@ -6,8 +6,8 @@ terms. Submit only work you have the right to contribute, and preserve existing
 third-party license and attribution notices. Dependency licenses are documented
 separately in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-The repository is in private pre-release review. Public visibility and any
-package/image release require a separate maintainer decision. Do not attach
+This is pre-release source under review. Changes to repository visibility and any
+package/image release require a maintainer decision. Do not attach
 production records or external customer material to a contribution.
 
 ## Development and review
