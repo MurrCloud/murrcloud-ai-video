@@ -27,7 +27,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "jsdom": "^27.0.0",
-    "tailwindcss": "^4.1.0",
+    "tailwindcss": "^4.3.5",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
   },
