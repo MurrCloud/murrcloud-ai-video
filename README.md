@@ -28,7 +28,7 @@ development machine. Preserve unrelated workloads and use dedicated credentials.
 2. `uv sync --frozen`
 3. `docker compose config --quiet` then `docker compose up -d postgres redis`
 4. `docker compose run --rm api alembic -c apps/backend/alembic.ini upgrade head`
-5. `docker compose run --rm api python -m app.cli create-user --email admin@example.test --role admin`
+5. `docker compose run --rm api python -m app.cli create-user --email admin@example.com --role admin`
    The CLI prompts for the password; do not put it in shell arguments.
 6. `docker compose up -d api` then check `http://127.0.0.1:8100/health/ready`.
 7. `docker compose run --rm api python -m app.cli seed-models`
