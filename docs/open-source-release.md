@@ -14,15 +14,23 @@ Use this publication sequence:
    scope for the maintainer's decision. Binary/container distribution, deployment
    and live feature enablement remain separate decisions.
 2. Complete the pre-publication checks below for that exact revision. Review
-   Actions artifacts as well as source. Before changing visibility, confirm that
-   no packaging workflow runs are queued or running and no binary artifacts are
-   retained; private runtime-image artifacts must not become public through a
-   source-only visibility change.
+   Actions artifacts as well as source. Before changing visibility, disable
+   `deployment-images.yml` repository-wide and verify that
+   `GET /repos/MurrCloud/murrcloud-ai-video/actions/workflows/deployment-images.yml`
+   returns workflow `state: disabled_manually`. Older dispatchable branches or
+   tags may contain unguarded workflow definitions. Confirm that no packaging
+   workflow runs are queued or running and no binary artifacts are retained;
+   private runtime-image artifacts must not become public through a source-only
+   visibility change.
 3. Record the maintainer's authorization for the reviewed revision and scope.
-   Recheck the final commit, intended disclosure and packaging run/artifact state
-   immediately before changing visibility. The workflow's private-only guard and
-   final privacy check do not atomically lock repository visibility. If the source
-   revision changes, update the review and authorization record before proceeding.
+   Recheck the final commit, intended disclosure, repository-wide disabled
+   workflow state and packaging run/artifact state immediately before changing
+   visibility. The revised workflow's private-only guard and final privacy check
+   do not atomically lock repository visibility or protect historical refs.
+   Keep packaging disabled throughout a source-only public release. Re-enabling
+   requires separate binary-distribution approval and reviewed guards on all
+   dispatchable refs. If the source revision changes, update the review and
+   authorization record before proceeding.
 4. After the repository becomes public, enable and verify private vulnerability
    reporting, required status checks and branch/PR rules, dependency alerts, and
    available secret-scanning/push-protection controls. Review Actions permissions
@@ -95,11 +103,15 @@ distributing browser bundles, wheels, images or downloadable runtime bundles:
    reproducible contents where applicable, and the documented release scope.
    Resolve remaining distribution questions before offering the artifacts.
 
-The repository's packaging workflow is private-only and prepares bounded image
-artifacts for private review. It does not distribute binaries from the public
-repository. Producing an artifact does not establish that its license obligations
-have been completed or authorize public/customer distribution. This document is
-a release procedure, not a certification of complete third-party compliance.
+The revised packaging workflow on `main` has private-only guards and prepares
+bounded image artifacts for private review. Historical dispatchable refs are not
+guaranteed to have those guards, so repository-wide disabling and verification
+are required for a source-only public release. Keep the workflow disabled until
+separate binary-distribution approval and guard review of all dispatchable refs
+are complete. Producing an artifact does not establish that its license
+obligations have been completed or authorize public/customer distribution. This
+document is a release procedure, not a certification of complete third-party
+compliance.
 
 ## Live feature and deployment acceptance
 
