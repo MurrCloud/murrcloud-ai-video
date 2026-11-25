@@ -29,3 +29,7 @@ backups/
 *.tar
 *.tar.gz
 *.zip
+
+# Python packaging outputs are verified locally, never tracked as source.
+/build/
+/dist/

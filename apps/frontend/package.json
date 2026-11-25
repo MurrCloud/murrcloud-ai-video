@@ -3,7 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3100",
     "build": "next build --webpack",
@@ -28,5 +30,6 @@
     "tailwindcss": "^4.1.0",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
-  }
+  },
+  "license": "Apache-2.0"
 }

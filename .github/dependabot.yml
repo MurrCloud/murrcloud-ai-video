@@ -1,0 +1,41 @@
+version: 2
+
+# uv.lock is canonical for Python. After a uv dependency PR, regenerate BOTH
+# requirements.lock (--no-dev) and requirements-dev.lock with:
+# uv export --frozen --no-emit-project --format requirements.txt --output-file FILE
+# The security workflow rejects inconsistent exports; do not edit pins by hand.
+# Review all updates and their CI results. No automatic merge is configured.
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: npm
+    directory: /apps/frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: docker
+    directory: /infrastructure/docker
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    ignore:
+      # These references are local build outputs, not published dependencies.
+      - dependency-name: murrcloud-video-*

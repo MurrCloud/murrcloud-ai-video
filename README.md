@@ -1,9 +1,13 @@
 # MurrCloud AI Video Studio
 
-Private source staging copy for review. This repository contains the Phase 5
-application and reusable infrastructure examples. It contains no production
-inventory, deployment evidence, authorization or original repository history.
-Keep this repository private during review. No license has been selected.
+An AI video production workspace with the Phase 5 application and reusable
+infrastructure examples. Application source is licensed under
+[Apache-2.0](LICENSE). Third-party dependencies keep their own licenses; see
+[dependency notices](THIRD_PARTY_NOTICES.md).
+
+The repository is being prepared for open-source release and stays private during
+review. Release preparation and remaining gates are in the
+[open-source release checklist](docs/open-source-release.md).
 
 The platform includes a model catalog and fal jobs, OpenAI director/storyboards,
 DOCX and private planning references, narration adapters, speech-boundary SRT,
@@ -88,5 +92,6 @@ master remains API-only and independent of database/media backups.
 - `infrastructure`: containers, generic proxy/systemd examples and admission monitor.
 - `scripts`, `tests`, `docs`: operations tools, synthetic verification and design.
 
-Follow [AGENTS.md](AGENTS.md). Public release, reuse licensing, security policy,
-binary dependency notices and production acceptance remain review decisions.
+Follow [AGENTS.md](AGENTS.md), the [contribution guide](CONTRIBUTING.md) and
+[security policy](SECURITY.md). Source-publication review, third-party binary
+distribution requirements and live production acceptance are separate gates.

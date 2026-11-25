@@ -18,6 +18,7 @@ ENV NODE_ENV=production \
 RUN addgroup -g 10001 murrvideo \
     && adduser -D -H -u 10001 -G murrvideo murrvideo
 WORKDIR /app
+COPY LICENSE THIRD_PARTY_NOTICES.md /app/
 COPY --from=build --chown=10001:10001 /app/.next/standalone ./
 COPY --from=build --chown=10001:10001 /app/.next/static ./.next/static
 COPY --from=build --chown=10001:10001 /app/public ./public

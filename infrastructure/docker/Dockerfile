@@ -12,7 +12,7 @@ RUN groupadd --gid 10001 murrvideo \
     && install -d -m 0755 /app /opt/video
 
 WORKDIR /app
-COPY pyproject.toml README.md requirements.lock /app/
+COPY pyproject.toml README.md LICENSE THIRD_PARTY_NOTICES.md requirements.lock /app/
 COPY apps/backend /app/apps/backend
 COPY workers /app/workers
 COPY infrastructure/docker/worker-entrypoint.py infrastructure/docker/worker-health.py /opt/video/
