@@ -1,0 +1,16 @@
+.git
+.local-deployment
+.env*
+!.env.example
+.venv
+.runtimes
+.uv-cache
+**/__pycache__
+**/node_modules
+**/.next
+data
+scratch
+storage
+backups
+*.db
+*.log

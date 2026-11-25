@@ -1,0 +1,16 @@
+# Temporary Studio-only HTTP site for dedicated certificate issuance.
+# No existing ERP site/certificate file is edited or replaced.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name video.example.test;
+    server_tokens off;
+    access_log off;
+    client_max_body_size 128k;
+    location ^~ /.well-known/acme-challenge/ {
+        root /srv/video-studio/acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / { return 503; }
+}

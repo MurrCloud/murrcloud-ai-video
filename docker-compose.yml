@@ -1,0 +1,273 @@
+name: murrcloud-video-studio
+
+x-app-environment: &app-environment
+  VIDEO_ENVIRONMENT: development
+  VIDEO_DATABASE_URL: ${VIDEO_DATABASE_URL:?Set a dedicated Video Studio database URL}
+  VIDEO_REDIS_URL: ${VIDEO_REDIS_URL:?Set a dedicated authenticated Redis URL}
+  VIDEO_SESSION_SECRET: ${VIDEO_SESSION_SECRET:?Set a random Video Studio session secret}
+  VIDEO_ALLOWED_ORIGINS: '["http://localhost:8100","http://127.0.0.1:8100","http://localhost:3100","http://127.0.0.1:3100"]'
+  VIDEO_COOKIE_SECURE: "false"
+  VIDEO_STORAGE_DIR: /var/lib/video
+  VIDEO_TEMP_DIR: /tmp/video
+  VIDEO_HOST_SIGNAL_PATH: /run/video-host/host.json
+  VIDEO_RENDER_ENABLED: "false"
+  VIDEO_PAID_GENERATION_ENABLED: "false"
+  VIDEO_DIRECTOR_ENABLED: "false"
+  VIDEO_NARRATION_ENABLED: "false"
+  VIDEO_S3_ENABLED: "false"
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  VIDEO_FFMPEG_THREADS: "1"
+
+x-worker: &worker
+  image: murrcloud-video-backend:phase1
+  build:
+    context: .
+    dockerfile: infrastructure/docker/Dockerfile
+    target: base
+  profiles: [workers]
+  user: "10001:10001"
+  restart: "no"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  init: true
+  networks: [video_internal]
+  environment: *app-environment
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    - video_storage:/var/lib/video
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=10001,gid=10001,mode=0700
+  healthcheck:
+    test: [CMD, python, /opt/video/worker-health.py]
+    interval: 60s
+    timeout: 15s
+    retries: 3
+    start_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  api:
+    image: murrcloud-video-backend:phase1
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: base
+    user: "10001:10001"
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8100", --workers, "1", --no-server-header, --no-access-log]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    cpus: 0.25
+    mem_limit: 384m
+    mem_reservation: 192m
+    ports:
+      - "127.0.0.1:8100:8100"
+    networks: [video_internal]
+    environment:
+      <<: *app-environment
+      VIDEO_FAL_KEY: ${VIDEO_FAL_KEY:-}
+      VIDEO_PAID_APPROVAL_REFERENCE: ${VIDEO_PAID_APPROVAL_REFERENCE:-}
+      VIDEO_OPENAI_API_KEY: ${VIDEO_OPENAI_API_KEY:-}
+      VIDEO_PROVIDER_KEY_ENCRYPTION_KEY: ${VIDEO_PROVIDER_KEY_ENCRYPTION_KEY:-}
+      VIDEO_DIRECTOR_MODEL: ${VIDEO_DIRECTOR_MODEL:-}
+      VIDEO_DIRECTOR_APPROVAL_REFERENCE: ${VIDEO_DIRECTOR_APPROVAL_REFERENCE:-}
+    volumes:
+      - video_storage:/var/lib/video
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,uid=10001,gid=10001,mode=0700
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health/ready', timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  postgres:
+    image: postgres:17-bookworm
+    user: "999:999"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    cpus: 0.35
+    mem_limit: 512m
+    mem_reservation: 256m
+    networks: [video_internal]
+    environment:
+      POSTGRES_DB: video_studio
+      POSTGRES_USER: video
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a dedicated database password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+    command: [postgres, -c, shared_buffers=128MB, -c, max_connections=30, -c, work_mem=4MB, -c, temp_file_limit=65536, -c, log_statement=none, -c, log_min_error_statement=panic]
+    volumes:
+      - video_postgres:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,uid=999,gid=999,mode=0700
+      - /var/run/postgresql:rw,noexec,nosuid,nodev,size=16m,uid=999,gid=999,mode=0770
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -q -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  redis:
+    image: redis:7.4-alpine
+    user: "999:999"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    cpus: 0.15
+    mem_limit: 128m
+    mem_reservation: 64m
+    networks: [video_internal]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set a dedicated Redis password}
+    entrypoint: [/bin/sh, /opt/video/redis-entrypoint.sh]
+    volumes:
+      - video_redis:/data
+      - ./infrastructure/docker/redis-entrypoint.sh:/opt/video/redis-entrypoint.sh:ro
+      - ./infrastructure/docker/redis-health.sh:/opt/video/redis-health.sh:ro
+    tmpfs:
+      - /run/redis:rw,noexec,nosuid,nodev,size=1m,uid=999,gid=999,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=8m,uid=999,gid=999,mode=0700
+    healthcheck:
+      test: [CMD, /bin/sh, /opt/video/redis-health.sh]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  generation-worker:
+    <<: *worker
+    command: [python, /opt/video/worker-entrypoint.py, generation]
+    cpus: 0.15
+    mem_limit: 256m
+    mem_reservation: 128m
+    environment:
+      <<: *app-environment
+      VIDEO_WORKER_QUEUE: generation
+      VIDEO_FAL_KEY: ${VIDEO_FAL_KEY:-}
+      VIDEO_PAID_APPROVAL_REFERENCE: ${VIDEO_PAID_APPROVAL_REFERENCE:-}
+      VIDEO_OPENAI_API_KEY: ${VIDEO_OPENAI_API_KEY:-}
+      VIDEO_DIRECTOR_MODEL: ${VIDEO_DIRECTOR_MODEL:-}
+      VIDEO_DIRECTOR_APPROVAL_REFERENCE: ${VIDEO_DIRECTOR_APPROVAL_REFERENCE:-}
+
+  narration-worker:
+    <<: *worker
+    image: murrcloud-video-narration:phase4
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: narration
+    command: [python, /opt/video/worker-entrypoint.py, narration]
+    cpus: 0.15
+    mem_limit: 384m
+    mem_reservation: 192m
+    environment:
+      <<: *app-environment
+      VIDEO_WORKER_QUEUE: narration
+
+  rendering-worker:
+    <<: *worker
+    image: murrcloud-video-render:phase1
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: render
+    command: [python, /opt/video/worker-entrypoint.py, rendering]
+    cpus: 0.25
+    mem_limit: 512m
+    mem_reservation: 256m
+    environment:
+      <<: *app-environment
+      VIDEO_WORKER_QUEUE: rendering
+      VIDEO_S3_ENDPOINT_URL: ${VIDEO_S3_ENDPOINT_URL:-}
+      VIDEO_S3_BUCKET: ${VIDEO_S3_BUCKET:-}
+      VIDEO_S3_REGION: ${VIDEO_S3_REGION:-us-east-1}
+      VIDEO_S3_ACCESS_KEY_ID: ${VIDEO_S3_ACCESS_KEY_ID:-}
+      VIDEO_S3_SECRET_ACCESS_KEY: ${VIDEO_S3_SECRET_ACCESS_KEY:-}
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,uid=10001,gid=10001,mode=0700
+
+  frontend:
+    profiles: [ui]
+    image: murrcloud-video-frontend:phase2
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+      args:
+        API_BASE_URL: http://api:8100
+    user: "10001:10001"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    cpus: 0.15
+    mem_limit: 256m
+    mem_reservation: 128m
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks: [video_internal]
+    depends_on:
+      api:
+        condition: service_healthy
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,uid=10001,gid=10001,mode=0700
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3100/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  video_internal:
+    internal: true
+
+volumes:
+  video_postgres:
+  video_redis:
+  video_storage:

@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Video Studio host signal every 30 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=1s
+Unit=murrcloud-video-host-signal.service
+
+[Install]
+WantedBy=timers.target

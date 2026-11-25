@@ -1,0 +1,192 @@
+name: Studio deployment images
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-deployment-images-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DOCKER_DEFAULT_PLATFORM: linux/amd64
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build initial application images on isolated CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          docker build --platform linux/amd64 --target base \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "murrcloud-video-backend:deploy-$GITHUB_SHA" \
+            --file infrastructure/docker/Dockerfile .
+          # The frontend build stage runs its tests, typecheck and production build.
+          docker build --platform linux/amd64 --target runtime \
+            --build-arg API_BASE_URL=http://api:8100 \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "murrcloud-video-frontend:deploy-$GITHUB_SHA" \
+            --file infrastructure/docker/frontend.Dockerfile .
+      - name: Resolve dedicated database and cache images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 postgres:17-bookworm
+          docker pull --platform linux/amd64 redis:7.4-alpine
+      - name: Export bounded runtime bundle and content manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime
+          import gzip
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import shutil
+          import signal
+          import subprocess
+
+          sha = os.environ["GITHUB_SHA"]
+          if not re.fullmatch(r"[0-9a-f]{40}", sha):
+              raise SystemExit("A full source commit is required")
+          images = [
+              ("api", f"murrcloud-video-backend:deploy-{sha}"),
+              ("frontend", f"murrcloud-video-frontend:deploy-{sha}"),
+              ("postgres", "postgres:17-bookworm"),
+              ("redis", "redis:7.4-alpine"),
+          ]
+          metadata = []
+          for service, reference in images:
+              raw = subprocess.check_output(
+                  ["docker", "image", "inspect", reference], timeout=30
+              )
+              records = json.loads(raw)
+              if len(records) != 1:
+                  raise SystemExit("Image resolution was ambiguous")
+              value = records[0]
+              if value["Os"] != "linux" or value["Architecture"] != "amd64":
+                  raise SystemExit("Only linux/amd64 deployment images are accepted")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", value["Id"]):
+                  raise SystemExit("Image content identity is invalid")
+              revision = (value["Config"].get("Labels") or {}).get(
+                  "org.opencontainers.image.revision"
+              )
+              if service in {"api", "frontend"}:
+                  if revision != sha or value["Config"].get("User") != "10001:10001":
+                      raise SystemExit("Application revision/non-root image mismatch")
+              elif not value.get("RepoDigests"):
+                  raise SystemExit("A resolved data-service registry digest is required")
+              metadata.append({
+                  "service": service,
+                  "reference": reference,
+                  "image_id": value["Id"],
+                  "repo_digests": sorted(value.get("RepoDigests") or []),
+                  "os": value["Os"],
+                  "architecture": value["Architecture"],
+                  "size_bytes": value["Size"],
+                  "revision": revision,
+              })
+          maximum_raw, maximum_archive = 4 * 1024**3, 2 * 1024**3
+          if sum(row["size_bytes"] for row in metadata) > maximum_raw:
+              raise SystemExit("Runtime images exceed the initial deployment size limit")
+          output = pathlib.Path("deployment-images")
+          output.mkdir(mode=0o700)
+          if shutil.disk_usage(output).free < maximum_archive + 1024**3:
+              raise SystemExit("Insufficient isolated runner staging capacity")
+          archive = output / "studio-images.tar.gz"
+          process = subprocess.Popen(
+              ["timeout", "--signal=TERM", "--kill-after=10s", "300",
+               "docker", "image", "save", *[reference for _, reference in images]],
+              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True,
+          )
+          raw_bytes = 0
+          try:
+              with archive.open("xb") as target:
+                  with gzip.GzipFile(filename="", mode="wb", fileobj=target,
+                                     compresslevel=1, mtime=0) as compressed:
+                      while chunk := process.stdout.read(1024**2):
+                          raw_bytes += len(chunk)
+                          if raw_bytes > maximum_raw:
+                              raise RuntimeError("Docker export exceeds raw size limit")
+                          compressed.write(chunk)
+                          if target.tell() > maximum_archive:
+                              raise RuntimeError("Compressed export exceeds size limit")
+                  target.flush()
+                  os.fsync(target.fileno())
+              if process.wait(timeout=15) != 0 or not raw_bytes:
+                  raise RuntimeError("Docker runtime export failed")
+              if archive.stat().st_size > maximum_archive:
+                  raise RuntimeError("Compressed export exceeds size limit")
+          except BaseException:
+              if process.poll() is None:
+                  os.killpg(process.pid, signal.SIGTERM)
+                  try:
+                      process.wait(timeout=10)
+                  except subprocess.TimeoutExpired:
+                      os.killpg(process.pid, signal.SIGKILL)
+                      process.wait(timeout=10)
+              archive.unlink(missing_ok=True)
+              raise
+          finally:
+              process.stdout.close()
+
+          def digest(path):
+              value = hashlib.sha256()
+              with path.open("rb") as source:
+                  while chunk := source.read(1024**2):
+                      value.update(chunk)
+              return value.hexdigest()
+
+          manifest = {
+              "schema_version": 1,
+              "source_sha": sha,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "created_at": datetime.datetime.now(datetime.UTC).isoformat(),
+              "platform": "linux/amd64",
+              "images": metadata,
+              "bundle": {
+                  "filename": archive.name,
+                  "sha256": digest(archive),
+                  "size_bytes": archive.stat().st_size,
+                  "uncompressed_bytes": raw_bytes,
+              },
+          }
+          manifest_path = output / "manifest.json"
+          manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
+          checksums = "".join(
+              f"{digest(path)}  {path.name}\n" for path in (archive, manifest_path)
+          )
+          (output / "SHA256SUMS").write_text(checksums)
+          # Retain hashes in the authenticated run log independently of the bundle.
+          print(checksums, end="")
+          print(f"Exported four runtime images; {archive.stat().st_size} compressed bytes")
+          PY
+      - name: Upload immutable deployment image artifact
+        id: runtime_artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: studio-deployment-images-${{ github.sha }}
+          path: |
+            deployment-images/studio-images.tar.gz
+            deployment-images/manifest.json
+            deployment-images/SHA256SUMS
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+          include-hidden-files: false
+      - name: Record artifact identity
+        env:
+          ARTIFACT_ID: ${{ steps.runtime_artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.runtime_artifact.outputs.artifact-digest }}
+        run: |
+          printf 'Artifact ID: %s\nArtifact SHA-256: %s\n' "$ARTIFACT_ID" "$ARTIFACT_DIGEST"

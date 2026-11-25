@@ -1,0 +1,97 @@
+# Generic VPS template; review addresses and paths before use. Combine base + prod + this file in order.
+# Images are imported from the authenticated CI bundle; never build on a shared host.
+x-vps-disabled-environment: &vps-disabled-environment
+  VIDEO_PAID_GENERATION_ENABLED: "false"
+  VIDEO_DIRECTOR_ENABLED: "false"
+  VIDEO_NARRATION_ENABLED: "false"
+  VIDEO_RENDER_ENABLED: "false"
+  VIDEO_S3_ENABLED: "false"
+  VIDEO_FAL_KEY: ""
+  VIDEO_OPENAI_API_KEY: ""
+  # Allows encrypted key staging only; all runtime provider keys/gates stay off.
+  VIDEO_PROVIDER_KEY_ENCRYPTION_KEY: ${VIDEO_PROVIDER_KEY_ENCRYPTION_KEY:-}
+  VIDEO_PAID_APPROVAL_REFERENCE: ""
+  VIDEO_DIRECTOR_MODEL: ""
+  VIDEO_DIRECTOR_APPROVAL_REFERENCE: ""
+
+services:
+  api:
+    image: ${VIDEO_BACKEND_IMAGE:?Set the verified imported backend image reference}
+    platform: linux/amd64
+    pull_policy: never
+    # Docker daemon auto-start must not bypass the systemd filesystem guard.
+    restart: "no"
+    # Docker 29 does not publish ports from this internal-only network.
+    # Host Nginx reaches the fixed private address; publish no host ports.
+    ports: !reset []
+    networks:
+      video_internal:
+        ipv4_address: 172.28.100.2
+    environment: *vps-disabled-environment
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8100"
+      - --workers
+      - "1"
+      - --no-server-header
+      - --no-access-log
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - ${VIDEO_TRUSTED_PROXY_IPS:-127.0.0.1}
+
+  frontend:
+    image: ${VIDEO_FRONTEND_IMAGE:?Set the verified imported frontend image reference}
+    platform: linux/amd64
+    pull_policy: never
+    restart: "no"
+    ports: !reset []
+    networks:
+      video_internal:
+        ipv4_address: 172.28.100.3
+
+  postgres:
+    image: ${VIDEO_POSTGRES_IMAGE:?Set the verified imported PostgreSQL image reference}
+    platform: linux/amd64
+    pull_policy: never
+    restart: "no"
+
+  redis:
+    image: ${VIDEO_REDIS_IMAGE:?Set the verified imported Redis image reference}
+    platform: linux/amd64
+    pull_policy: never
+    restart: "no"
+
+networks:
+  video_internal:
+    internal: true
+    # Synthetic private address range; choose a nonconflicting range for your host.
+    ipam:
+      config:
+        - subnet: 172.28.100.0/28
+          gateway: 172.28.100.1
+          # Dynamic database/cache addresses cannot take the Nginx upstreams.
+          ip_range: 172.28.100.8/29
+
+volumes:
+  video_postgres:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/video-studio/postgres
+  video_redis:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/video-studio/redis
+  video_storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/video-studio/media

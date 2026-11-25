@@ -1,0 +1,16 @@
+# Install under the exact name returned by:
+# systemd-escape --path --suffix=mount /var/cache/video-studio/nginx-body
+# Precreate its root-owned parent (0755) and underlying www-data:33 directory (0700).
+# Do not add dependencies to the shared nginx.service or Studio data filesystem.
+[Unit]
+Description=Bounded MurrCloud Video Studio Nginx body staging
+
+[Mount]
+What=tmpfs
+Where=/var/cache/video-studio/nginx-body
+Type=tmpfs
+Options=size=16M,mode=0700,uid=33,gid=33,nodev,nosuid,noexec
+TimeoutSec=15
+
+[Install]
+WantedBy=multi-user.target

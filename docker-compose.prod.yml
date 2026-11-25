@@ -1,0 +1,41 @@
+# Supply both files: docker compose -f docker-compose.yml -f docker-compose.prod.yml ...
+# This file prepares a PRIVATE Phase 1 deployment. It does not publish an edge.
+x-production-environment: &production-environment
+  VIDEO_ENVIRONMENT: production
+  VIDEO_ALLOWED_ORIGINS: ${VIDEO_ALLOWED_ORIGINS:?Set an explicit JSON list of approved HTTPS origins}
+  VIDEO_COOKIE_SECURE: "true"
+  VIDEO_RENDER_ENABLED: "false"
+  VIDEO_PAID_GENERATION_ENABLED: "false"
+  VIDEO_DIRECTOR_ENABLED: "false"
+  VIDEO_NARRATION_ENABLED: "false"
+  VIDEO_S3_ENABLED: "false"
+  VIDEO_HOST_SIGNAL_PATH: /run/video-host/host.json
+
+x-host-signal: &host-signal
+  type: bind
+  source: ${VIDEO_HOST_SIGNAL_FILE:?Provide an existing private host-signal JSON file}
+  target: /run/video-host/host.json
+  read_only: true
+  bind:
+    create_host_path: false
+
+services:
+  api:
+    environment: *production-environment
+    volumes:
+      - *host-signal
+
+  generation-worker:
+    environment: *production-environment
+    volumes:
+      - *host-signal
+
+  narration-worker:
+    environment: *production-environment
+    volumes:
+      - *host-signal
+
+  rendering-worker:
+    environment: *production-environment
+    volumes:
+      - *host-signal

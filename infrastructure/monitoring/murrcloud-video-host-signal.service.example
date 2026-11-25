@@ -1,0 +1,25 @@
+# TEMPLATE: supply reviewed health target and protected units before installation.
+[Unit]
+Description=Refresh bounded Video Studio host admission signal
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /opt/video-studio/infrastructure/monitoring/collect-host-signal.py --output /var/lib/video-studio/host.json --erp-unit erp.service --postgres-unit postgresql.service --nginx-unit nginx.service --erp-health-url https://erp.example.test/health
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/video-studio
+MemoryMax=64M
+CPUQuota=5%
+TimeoutStartSec=20
+StandardOutput=null
+StandardError=null

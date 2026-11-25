@@ -1,0 +1,69 @@
+# Existing-VPS HTTPS candidate. Existing ERP virtual-host files stay unchanged.
+# Pair with compose.vps.yml: fixed private upstreams, no published Docker ports.
+# Activate only after the new DNS record and dedicated certificate are ready.
+# Check the full host configuration for duplicate names/limits before use.
+limit_req_zone $binary_remote_addr zone=murrcloud_video_api:1m rate=5r/s;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name video.example.test;
+    location ^~ /.well-known/acme-challenge/ {
+        root /srv/video-studio/acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / { return 301 https://video.example.test$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name video.example.test;
+    # Dedicated Studio certificate; never reuse/replace an ERP certificate.
+    ssl_certificate /etc/letsencrypt/live/video.example.test/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/video.example.test/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    server_tokens off;
+    access_log off;
+    error_log /var/log/nginx/murrcloud-video.error.log warn;
+    # Backend keeps stricter per-route limits, including 5 MiB upload content.
+    client_max_body_size 6m;
+    # Always-existing host directory; optional 16 MiB tmpfs bounds body staging.
+    # Shared Nginx must stay independent of the Studio data filesystem.
+    client_body_temp_path /var/cache/video-studio/nginx-body 1 2;
+    client_body_timeout 15s;
+    send_timeout 30s;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+
+    location /health/ { return 404; }
+    location /api/ {
+        limit_req zone=murrcloud_video_api burst=10 nodelay;
+        limit_req_status 429;
+        proxy_pass http://172.28.100.2:8100;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_set_header Host video.example.test;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_buffering off;
+    }
+    location / {
+        proxy_pass http://172.28.100.3:3100;
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_set_header Host video.example.test;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+}

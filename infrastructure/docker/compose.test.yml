@@ -1,0 +1,85 @@
+# Disposable CI only: combine with docker-compose.yml and an explicit CI project.
+services:
+  api:
+    ports: !reset []
+    environment:
+      # Repeated isolated owner/proxy/restart fixtures share a CI client IP.
+      VIDEO_LOGIN_ATTEMPTS_PER_MINUTE: "30"
+      # Repeated isolated API/proxy/parallel-read fixtures share one runner IP.
+      # Production's 120/minute API limit is unchanged; limiter tests stay active.
+      VIDEO_API_REQUESTS_PER_MINUTE: "1000"
+
+  frontend:
+    ports: !reset []
+
+  # Disposable health-task transport check, never an ERP workload/admission test.
+  # Paid generation remains false. No real generation tasks are dispatched.
+  generation-worker:
+    command: [celery, -A, app.worker:celery_app, worker, --hostname=video-generation@%h,
+              --queues=generation, --concurrency=1, --pool=prefork,
+              --prefetch-multiplier=1, --without-gossip, --without-mingle, --loglevel=WARNING]
+
+  # Synthetic local rendering only; no paid/provider or live Edge calls.
+  rendering-worker:
+    command: [celery, -A, app.worker:celery_app, worker, --hostname=video-rendering@%h,
+              --queues=rendering, --concurrency=1, --pool=prefork,
+              --prefetch-multiplier=1, --without-gossip, --without-mingle, --loglevel=WARNING]
+    environment:
+      VIDEO_RENDER_ENABLED: "true"
+      VIDEO_NARRATION_ENABLED: "false"
+      VIDEO_HOST_SIGNAL_PATH: /var/lib/video/ci-host-signal.json
+
+  tests:
+    image: murrcloud-video-tests:phase1
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: test
+    profiles: [test]
+    user: "10001:10001"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    cpus: 0.50
+    mem_limit: 768m
+    networks: [video_internal]
+    environment:
+      VIDEO_ENVIRONMENT: test
+      VIDEO_DATABASE_URL: ${VIDEO_DATABASE_URL:?Set a dedicated Video Studio database URL}
+      VIDEO_TEST_DATABASE_URL: ${VIDEO_TEST_DATABASE_URL:?Set the disposable video_studio_test database URL}
+      VIDEO_LIVE_DATABASE_URL: ${VIDEO_DATABASE_URL:?Set a dedicated Video Studio database URL}
+      VIDEO_TEST_API_URL: http://api:8100
+      VIDEO_TEST_FRONTEND_URL: http://frontend:3100
+      VIDEO_LIVE_REDIS_URL: ${VIDEO_REDIS_URL:?Set an isolated broker URL}
+      VIDEO_TEST_WORKER_ENABLED: "true"
+      VIDEO_TEST_RENDER_WORKER_ENABLED: "true"
+      VIDEO_TEST_BACKUP_ENABLED: "true"
+      VIDEO_TEST_REDIS_URL: ${VIDEO_TEST_REDIS_URL:?Set a separate Redis database URL for integration tests}
+      VIDEO_TEST_PROVIDER_KEY_ENCRYPTION_KEY: ${VIDEO_PROVIDER_KEY_ENCRYPTION_KEY:-}
+      VIDEO_REDIS_URL: ${VIDEO_REDIS_URL:?Set a dedicated authenticated Redis URL}
+      VIDEO_SESSION_SECRET: ${VIDEO_SESSION_SECRET:?Set a random test session secret}
+      VIDEO_ALLOWED_ORIGINS: '["http://localhost:8100","http://127.0.0.1:8100"]'
+      VIDEO_COOKIE_SECURE: "false"
+      VIDEO_STORAGE_DIR: /tmp/test-storage
+      VIDEO_TEMP_DIR: /tmp/test-scratch
+      VIDEO_RENDER_ENABLED: "false"
+      VIDEO_NARRATION_ENABLED: "false"
+      VIDEO_PAID_GENERATION_ENABLED: "false"
+      VIDEO_FFMPEG_THREADS: "1"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,uid=10001,gid=10001,mode=0700
+    volumes:
+      - video_storage:/var/lib/video
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
