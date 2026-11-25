@@ -8,6 +8,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
+    # Public source releases do not authorize distribution of review image bundles.
+    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -171,6 +173,14 @@ jobs:
           print(checksums, end="")
           print(f"Exported four runtime images; {archive.stat().st_size} compressed bytes")
           PY
+      - name: Recheck repository privacy before uploading review images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository_private=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private')
+          test "$repository_private" = true
       - name: Upload immutable deployment image artifact
         id: runtime_artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

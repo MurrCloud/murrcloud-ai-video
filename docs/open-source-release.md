@@ -8,6 +8,41 @@ until the maintainer explicitly authorizes publication.
 
 ## Source-only publication
 
+Use this publication sequence:
+
+1. Record the full source commit SHA proposed for publication and the source-only
+   scope for the maintainer's decision. Binary/container distribution, deployment
+   and live feature enablement remain separate decisions.
+2. Complete the pre-publication checks below for that exact revision. Review
+   Actions artifacts as well as source. Before changing visibility, disable
+   `deployment-images.yml` repository-wide and verify that
+   `GET /repos/MurrCloud/murrcloud-ai-video/actions/workflows/deployment-images.yml`
+   returns workflow `state: disabled_manually`. Older dispatchable branches or
+   tags may contain unguarded workflow definitions. Confirm that no packaging
+   workflow runs are queued or running and no binary artifacts are retained;
+   private runtime-image artifacts must not become public through a source-only
+   visibility change.
+3. Record the maintainer's authorization for the reviewed revision and scope.
+   Recheck the final commit, intended disclosure, repository-wide disabled
+   workflow state and packaging run/artifact state immediately before changing
+   visibility. The revised workflow's private-only guard and final privacy check
+   do not atomically lock repository visibility or protect historical refs.
+   Keep packaging disabled throughout a source-only public release. Re-enabling
+   requires separate binary-distribution approval and reviewed guards on all
+   dispatchable refs. If the source revision changes, update the review and
+   authorization record before proceeding.
+4. After the repository becomes public, enable and verify private vulnerability
+   reporting, required status checks and branch/PR rules, dependency alerts, and
+   available secret-scanning/push-protection controls. Review Actions permissions
+   and repository write access in the public configuration. Record unavailable
+   controls and the maintainer's chosen handling; do not claim they are enabled.
+   Require the source validation contexts `foundation`, `Secret scan`,
+   `Python dependency audit` and `Frontend dependency audit` on the protected
+   branch, using the exact names emitted by successful workflow runs.
+5. Record the exact published SHA, verification results and remaining limitations
+   before inviting contributions or vulnerability reports. Verify the reporting
+   route in [SECURITY.md](../SECURITY.md), including the email fallback.
+
 Complete these checks for the exact source revision proposed for publication:
 
 - [ ] Confirm authority to license the first-party source and assets under
@@ -26,9 +61,11 @@ Complete these checks for the exact source revision proposed for publication:
   gates honestly; synthetic tests do not establish provider quality or capacity.
 - [ ] Verify disabled paid/director/narration/render/S3 defaults, blank runtime
   provider secrets, opt-in workers and fail-closed admission/host checks.
-- [ ] Review repository write access, branch/PR policy, Actions permissions,
-  dependency alerts and secret-protection availability. Establish a working
-  private vulnerability-reporting route before inviting public reports.
+- [ ] Review repository write access, branch/PR policy, required checks, Actions
+  permissions, dependency alerts and secret-protection availability. Prepare the
+  public-settings verification above and verify the private email fallback in
+  [SECURITY.md](../SECURITY.md). Enable and verify GitHub private reporting after
+  the authorized visibility change, before inviting contributions or reports.
 - [ ] Review public README, examples, issue/release templates, CI logs, artifacts,
   links and repository metadata for intended disclosure. Do not publish binary
   bundles under the label of a source-only release.
@@ -66,10 +103,15 @@ distributing browser bundles, wheels, images or downloadable runtime bundles:
    reproducible contents where applicable, and the documented release scope.
    Resolve remaining distribution questions before offering the artifacts.
 
-The repository's packaging workflow prepares bounded image artifacts for review.
-Producing an artifact does not establish that its license obligations have been
-completed or authorize public/customer distribution. This document is a release
-procedure, not a certification of complete third-party compliance.
+The revised packaging workflow on `main` has private-only guards and prepares
+bounded image artifacts for private review. Historical dispatchable refs are not
+guaranteed to have those guards, so repository-wide disabling and verification
+are required for a source-only public release. Keep the workflow disabled until
+separate binary-distribution approval and guard review of all dispatchable refs
+are complete. Producing an artifact does not establish that its license
+obligations have been completed or authorize public/customer distribution. This
+document is a release procedure, not a certification of complete third-party
+compliance.
 
 ## Live feature and deployment acceptance
 

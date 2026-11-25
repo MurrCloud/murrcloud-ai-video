@@ -5,8 +5,8 @@ infrastructure examples. Application source is licensed under
 [Apache-2.0](LICENSE). Third-party dependencies keep their own licenses; see
 [dependency notices](THIRD_PARTY_NOTICES.md).
 
-The repository is being prepared for open-source release and stays private during
-review. Release preparation and remaining gates are in the
+This is pre-release source with separate review gates for source publication,
+binary distribution and live deployment. Preparation and remaining gates are in the
 [open-source release checklist](docs/open-source-release.md).
 
 The platform includes a model catalog and fal jobs, OpenAI director/storyboards,

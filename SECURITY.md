@@ -12,18 +12,21 @@ must be documented here before a supported release is announced.
 Do not post exploit details, credentials, customer data or private host evidence
 in issues, pull requests, discussions or workflow logs.
 
-During private review, report concerns directly to a repository maintainer through
-the private channel used to arrange access. The repository owner coordinates
-triage. Contributors must not invent a reporting email or assume ordinary issues
-are a confidential reporting channel.
-
-Before making the repository public, maintainers must enable GitHub private
-vulnerability reporting and verify its operation. Once enabled, use **Report a
+When GitHub private vulnerability reporting is enabled, use **Report a
 vulnerability** on the repository's
-[Security advisories page](https://github.com/gcenterprises/murrcloud-ai-video/security/advisories).
-If the private reporting control is unavailable, arrange a confidential channel
-with a maintainer before sharing sensitive details. This is a release gate, not
-a claim that reporting is already enabled on the private repository.
+[Security advisories page](https://github.com/MurrCloud/murrcloud-ai-video/security/advisories).
+If that control is unavailable, including during private review, send a report
+to [contact@murrcloud.com](mailto:contact@murrcloud.com) with the subject
+`Security report: murrcloud-ai-video`. This mailbox is the private reporting
+fallback; ordinary issues are not a confidential channel. Exclude credentials,
+customer data and private host evidence from email, and arrange a suitable
+private transfer with a maintainer if additional sensitive material is needed.
+
+For an authorized source publication, maintainers must enable and verify GitHub
+private vulnerability reporting immediately after the repository becomes public,
+before inviting contributions or public vulnerability reports. Record that check
+with the exact published source revision. This policy does not claim that the
+GitHub reporting control is already enabled.
 
 Include the affected commit/version, impact, a minimal synthetic reproduction,
 and any proposed fix. Never test against a deployment you do not own or have

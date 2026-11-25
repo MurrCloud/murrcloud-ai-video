@@ -31,8 +31,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/gcenterprises/murrcloud-ai-video"
-Issues = "https://github.com/gcenterprises/murrcloud-ai-video/issues"
+Repository = "https://github.com/MurrCloud/murrcloud-ai-video"
+Issues = "https://github.com/MurrCloud/murrcloud-ai-video/issues"
 
 [dependency-groups]
 dev = ["pytest>=8.3,<10", "ruff>=0.11,<1", "pyyaml>=6,<7"]
