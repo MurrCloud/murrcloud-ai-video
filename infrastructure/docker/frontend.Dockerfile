@@ -1,4 +1,4 @@
-FROM node:24-alpine AS dependencies
+FROM node:26-alpine AS dependencies
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY apps/frontend/package.json apps/frontend/package-lock.json ./
@@ -10,7 +10,7 @@ ARG API_BASE_URL=http://api:8100
 ENV API_BASE_URL=$API_BASE_URL
 RUN npm test && npm run typecheck && npm run build
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
