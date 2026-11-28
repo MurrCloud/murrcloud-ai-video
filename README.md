@@ -15,7 +15,8 @@ provider API keys. Paid video generation, the AI Director, narration, rendering,
 and S3 are disabled by default and need separate configuration and acceptance.
 The interface is English; projects and narration support English and 简体中文.
 
-[Watch the demo](#watch-the-demo) · [Quick start](#quick-start) · [First project](#create-your-first-project) ·
+[Watch the demo](#watch-the-demo) · [Quick start](#quick-start) ·
+[First project](#create-your-first-project) ·
 [Development](#development-and-checks) · [Documentation](#documentation) ·
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
@@ -25,7 +26,9 @@ A **1 minute 26 second** walkthrough of the local planning workspace: start from
 a script, edit storyboard scenes, validate the saved plan, review estimates, and
 reuse a project as a template.
 
-[Watch the demo on the MurrCloud website](https://murrcloud.com/projects/ai-video-studio#demo).
+https://github.com/user-attachments/assets/49afb85a-f1ff-434d-bbe7-49f8c94b19d8
+
+[Watch with English captions on the MurrCloud website](https://murrcloud.com/projects/ai-video-studio#demo).
 
 Recorded locally with a fictional project. Paid generation is disabled, and
 billing prices shown are unverified. The voiceover was created separately from
